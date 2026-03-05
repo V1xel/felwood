@@ -1,0 +1,21 @@
+# Build directories (CMake / Ninja)
+build/
+cmake-build-*/
+
+# IDE
+.idea/
+
+# Compiled output
+*.exe
+*.dll
+*.o
+*.obj
+*.a
+*.lib
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
