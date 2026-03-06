@@ -1,31 +1,5 @@
 #pragma once
 
-// ─────────────────────────────────────────────────────────────────────────────
-// felwood::ScanOperator – sequential table scan with column projection
-//
-// What this does:
-//   Reads a Table in slices of up to BATCH_SIZE rows and emits one Chunk per
-//   slice.  Column projection is applied eagerly: only the requested columns
-//   are copied, so downstream operators never see—or pay for—unrequested ones.
-//
-// Where a real engine diverges:
-//   • Reads from disk via async I/O (io_uring on Linux) or memory-mapped files;
-//     the scan overlaps I/O and CPU processing.
-//   • Columnar storage formats (Parquet, ORC, custom) store pages in compressed
-//     form; the scan decompresses only the needed pages with SIMD routines.
-//   • Page-level statistics (min/max zone maps, Bloom filters) allow the scan
-//     to skip entire pages without decompressing them (predicate pushdown).
-//   • Late materialisation: inexpensive filter columns are decoded first;
-//     expensive string columns are decoded only for rows that survive the filter.
-//   • For a partitioned table the scan is parallelised across worker threads,
-//     each thread processing an independent range of row groups.
-//
-// What to improve next:
-//   • Implement iterator-based access to an on-disk Parquet reader.
-//   • Add per-column skip logic driven by zone-map statistics.
-//   • Support asynchronous prefetching (double-buffered batches).
-// ─────────────────────────────────────────────────────────────────────────────
-
 #include "operators/operator.hpp"
 #include "storage/table.hpp"
 
@@ -39,7 +13,6 @@ namespace felwood {
 
 class ScanOperator final : public Operator {
 public:
-    // project_cols: subset of column names to emit; empty = all columns.
     explicit ScanOperator(const Table& table,
                           std::vector<std::string> project_cols = {})
         : table_(table)
@@ -73,7 +46,6 @@ public:
         const std::size_t batch_end  = std::min(current_row_ + BATCH_SIZE, total);
         const std::size_t batch_size = batch_end - current_row_;
 
-        // Build output chunk: one Column per projected column.
         std::vector<Column> out_cols;
         out_cols.reserve(projected_indices_.size());
 
@@ -81,7 +53,6 @@ public:
             const Column& src = table_.get_column(col_idx);
             Column dst(src.name, src.type);
 
-            // Copy [current_row_, batch_end) from src into dst.
             std::visit([&](auto& dst_vec) {
                 using VecT = std::decay_t<decltype(dst_vec)>;
                 const auto& src_vec = std::get<VecT>(src.data);
