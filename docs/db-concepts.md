@@ -41,4 +41,42 @@ A segment contains:
 
 Table schemas are also persisted to disk so they survive process restart.
 
-Felwood has no segment files — all data lives in `std::vector` in RAM and is lost on process exit.
+Felwood has no segment files — data is persisted as one raw binary file per column (`felwood_data/<table>/<col>.col`), with no indexes or compression. The schema is saved as a text file alongside the column files and loaded on startup.
+
+## Write-Ahead Log (WAL)
+
+Before modifying any in-memory or on-disk data structure, the change is appended to a WAL file first (sequential I/O — fast). On crash, the engine replays the WAL to reconstruct any writes that hadn't been fully flushed to their final storage location. The WAL is truncated once the corresponding data has been durably flushed.
+
+Felwood has no WAL — if the process dies mid-flush, any rows being written at that moment are silently lost.
+
+## MemTable
+
+An in-memory write buffer that accumulates incoming rows before they are flushed to disk as an immutable file. In engines like Apache Doris or RocksDB, the MemTable is sorted by the primary/sort key, so each flush produces a sorted run on disk.
+
+Benefits: amortises the cost of many small writes into one large sequential write, and the sort enables efficient merge during compaction.
+
+Felwood has no MemTable — each INSERT flushes directly to the column files immediately.
+
+## Compaction
+
+The background process that merges multiple small immutable files (produced by MemTable flushes) into fewer, larger files. This reduces **read amplification** — the number of files that must be scanned per query — at the cost of extra write I/O.
+
+Compaction is what makes LSM-tree engines (RocksDB, Doris, ClickHouse MergeTree) efficient for reads despite using an append-only write path.
+
+Two common strategies:
+- **Size-tiered** — merge files of similar size; write-efficient but produces large files
+- **Leveled** — files are organised into levels with size limits; read-efficient but more write I/O
+
+Felwood has no compaction — column files grow unboundedly with each INSERT.
+
+## Key Models (Table Semantics)
+
+How an engine handles rows with the same primary key:
+
+- **Duplicate Key** — all rows are kept exactly as inserted (pure append)
+- **Aggregate Key** — rows sharing the same key are merged at compaction time using a specified aggregate function (SUM, MAX, etc.); useful for pre-aggregated fact tables
+- **Unique Key** — only the latest version of each key is retained (upsert semantics); older versions are discarded at compaction
+
+Apache Doris exposes all three as a table-creation option. ClickHouse achieves similar results via `ReplacingMergeTree` (Unique) and `AggregatingMergeTree` (Aggregate).
+
+Felwood uses Duplicate Key only — every INSERT appends a new row unconditionally.
