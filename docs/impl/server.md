@@ -67,8 +67,8 @@ Pure serialisation / deserialisation helpers — no sockets. Implements enough o
 
 | Function | Description |
 |----------|-------------|
-| `send_result_set(sock, seq, chunk)` | Send a complete result set for a `Chunk` (column count → column defs → EOF → rows → EOF) |
-| `send_single_value(sock, seq, col_name, value)` | Convenience: one-column, one-row result set |
+| `send_result_set(sock, seq, chunk)` | Send a complete result set for a `Chunk` |
+| `send_single_value(sock, seq, col_name, value)` | One-column, one-row result set |
 | `send_ok(sock, seq)` | Send an OK packet |
 
 ---
@@ -76,8 +76,6 @@ Pure serialisation / deserialisation helpers — no sockets. Implements enough o
 ## MysqlServer (`mysql_server.hpp`)
 
 TCP accept loop with MySQL wire-protocol handling. Listens on a configured port, accepts connections (one thread per connection), runs the MySQL handshake, then dispatches `COM_QUERY` commands.
-
-Only the demo GROUP BY / aggregate query against `employees` is actually executed. All other statements (`SET`, `SHOW`, `@@variables`, `SELECT 1`) receive minimal stub responses so that standard MySQL drivers complete their connection handshake without errors.
 
 ### Connection state machine (`handle_connection`)
 
@@ -102,15 +100,3 @@ Uppercases and left-trims the SQL string, then matches against a priority list:
 | `SHOW TABLES` | Single-value result: `"employees"` |
 | Contains `FROM EMPLOYEES` | Run demo pipeline, send result set |
 | Default | OK |
-
-### Demo pipeline (`run_demo_query`)
-
-Builds the operator tree at query time:
-
-```
-Scan {department, salary}
-  → Filter {salary > 50 000}
-    → Aggregate {GROUP BY department, SUM/COUNT/AVG salary}
-```
-
-Opens the tree, pulls the single result chunk, closes the tree, and returns the chunk.

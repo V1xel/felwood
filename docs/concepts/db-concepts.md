@@ -26,23 +26,6 @@ The OS has its own swap mechanism that moves memory to disk transparently, but d
 
 Felwood's `AggregateOperator` has no memory budget or spilling — if the hash table exceeds available RAM the process runs out of memory.
 
-## Segment Files
-
-A segment file is the on-disk unit of columnar storage used by engines like Apache Doris. Each segment holds the data for a batch of rows across all columns, plus the metadata needed to query it efficiently.
-
-A segment contains:
-
-- **Column data** — raw bytes for each column, compressed and encoded
-- **ZoneMap index** — min/max values per page; allows skipping entire pages that cannot satisfy a WHERE condition
-- **Bloom filter** — probabilistic structure per column; fast rejection of pages that don't contain a queried value
-- **Bitmap index** — maps each distinct value to the set of rows containing it; efficient for low-cardinality columns
-- **Delete markers / MVCC** — records which rows have been deleted or superseded by updates, without rewriting the segment
-- **Transactional metadata** — commit information so partial writes are never visible to readers
-
-Table schemas are also persisted to disk so they survive process restart.
-
-Felwood has no segment files — data is persisted as one raw binary file per column (`felwood_data/<table>/<col>.col`), with no indexes or compression. The schema is saved as a text file alongside the column files and loaded on startup.
-
 ## Write-Ahead Log (WAL)
 
 Before modifying any in-memory or on-disk data structure, the change is appended to a WAL file first (sequential I/O — fast). On crash, the engine replays the WAL to reconstruct any writes that hadn't been fully flushed to their final storage location. The WAL is truncated once the corresponding data has been durably flushed.
@@ -55,7 +38,7 @@ An in-memory write buffer that accumulates incoming rows before they are flushed
 
 Benefits: amortises the cost of many small writes into one large sequential write, and the sort enables efficient merge during compaction.
 
-Felwood has no MemTable — each INSERT flushes directly to the column files immediately.
+Felwood has no MemTable — each INSERT rewrites the segment file immediately.
 
 ## Compaction
 
@@ -67,7 +50,7 @@ Two common strategies:
 - **Size-tiered** — merge files of similar size; write-efficient but produces large files
 - **Leveled** — files are organised into levels with size limits; read-efficient but more write I/O
 
-Felwood has no compaction — column files grow unboundedly with each INSERT.
+Felwood has no compaction — a single segment file per table is rewritten on every INSERT.
 
 ## Key Models (Table Semantics)
 

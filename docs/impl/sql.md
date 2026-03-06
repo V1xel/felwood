@@ -104,14 +104,17 @@ Helper methods:
 
 ## Catalog (`catalog.hpp`)
 
-Stores all live tables by name. Owns the `Table` objects via `unique_ptr` to keep addresses stable.
+Stores all live tables by name. Owns the `Table` objects via `unique_ptr`. Optionally backed by a `SegmentManager` for persistence.
 
 | Method | Description |
 |--------|-------------|
-| `create_table(name, schema)` | Create a new empty table; throws if name already exists |
-| `get_table(name)` | Returns a reference to the table; throws if not found |
+| `Catalog()` | In-memory only |
+| `Catalog(data_dir)` | Persistent: loads all tables from disk on construction |
+| `create_table(name, schema)` | Create a new empty table; throws if name already exists; flushes to disk if persistent |
+| `insert_row(name, values)` | Append a row; flushes to disk if persistent |
+| `get_table(name)` | Returns a reference; throws if not found |
 | `has_table(name)` | Check existence without throwing |
-| `all()` | Read-only access to the full table map (used by SHOW TABLES) |
+| `all()` | Read-only access to the full table map |
 
 ---
 
@@ -123,7 +126,7 @@ Entry point: `plan(stmt)` — dispatches via `std::visit` to the appropriate `ex
 
 **CREATE TABLE:** builds a `TableSchema` from the AST column list, calls `catalog_.create_table`.
 
-**INSERT:** calls `table.append_row` with the values from the AST.
+**INSERT:** calls `catalog_.insert_row` with the values from the AST.
 
 **SELECT:** builds the operator tree bottom-up:
 
@@ -141,4 +144,4 @@ ScanOperator(projected columns)
 |----------|-------------|
 | `eval_operand` | Reads a column value from the chunk or returns a literal |
 | `eval_condition` | Evaluates one `BinaryExpr` for a given row |
-| `compare_values` | Compares two `Value`s; numerics are coerced to `double`, strings use lexicographic order |
+| `compare_values` | Compares two `Value`s; numerics coerced to `double`, strings lexicographic |
