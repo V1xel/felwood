@@ -2,12 +2,10 @@
 
 ## What Real Engines Add (Architecture)
 
-- **Parser** (Bison / ANTLR) to convert SQL text into an AST
 - **Binder** to resolve names against the catalog
 - **Logical planner** to build a relational algebra tree
 - **Rule-based optimizer** for predicate pushdown and column pruning
 - **Cost-based optimizer** for cardinality estimation and join reordering
-- **Physical plan builder** that emits operator instances
 - **Push / producer model** (Hyper, Velox) to avoid virtual calls in the hot loop
 - **Morsel-driven parallelism** (Leis et al. 2014) for multi-threaded execution
 - **JIT / codegen** (LLVM) to fuse operators into a single tight loop per pipeline
