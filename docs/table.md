@@ -1,4 +1,4 @@
-# Storage Layer
+# Table
 
 Defined in `src/common/column.hpp` and `src/storage/table.hpp`.
 
