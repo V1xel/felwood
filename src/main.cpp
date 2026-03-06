@@ -17,7 +17,7 @@ static void run_sql(const std::string& sql, Catalog& catalog) {
 }
 
 int main() {
-    Catalog catalog;
+    Catalog catalog("felwood_data");
 
     MysqlServer server(3306, catalog);
     std::cout << "Felwood listening on port 3306 ...\n";

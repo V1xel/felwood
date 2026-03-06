@@ -34,7 +34,7 @@ namespace felwood {
         }
 
         std::optional<std::unique_ptr<Operator>> execute(const InsertStmt& stmt) {
-            catalog_.get_table(stmt.table).append_row(stmt.values);
+            catalog_.insert_row(stmt.table, stmt.values);
             return std::nullopt;
         }
 
