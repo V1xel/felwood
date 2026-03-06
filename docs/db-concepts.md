@@ -25,3 +25,20 @@ The common algorithm is **Grace Hash Aggregation**: hash the group key into N pa
 The OS has its own swap mechanism that moves memory to disk transparently, but databases don't rely on it — it's coarse (4KB pages), blind to data structure semantics, and reactive rather than proactive. Explicit spilling gives the engine full control over what is evicted, when, and in what format.
 
 Felwood's `AggregateOperator` has no memory budget or spilling — if the hash table exceeds available RAM the process runs out of memory.
+
+## Segment Files
+
+A segment file is the on-disk unit of columnar storage used by engines like Apache Doris. Each segment holds the data for a batch of rows across all columns, plus the metadata needed to query it efficiently.
+
+A segment contains:
+
+- **Column data** — raw bytes for each column, compressed and encoded
+- **ZoneMap index** — min/max values per page; allows skipping entire pages that cannot satisfy a WHERE condition
+- **Bloom filter** — probabilistic structure per column; fast rejection of pages that don't contain a queried value
+- **Bitmap index** — maps each distinct value to the set of rows containing it; efficient for low-cardinality columns
+- **Delete markers / MVCC** — records which rows have been deleted or superseded by updates, without rewriting the segment
+- **Transactional metadata** — commit information so partial writes are never visible to readers
+
+Table schemas are also persisted to disk so they survive process restart.
+
+Felwood has no segment files — all data lives in `std::vector` in RAM and is lost on process exit.
