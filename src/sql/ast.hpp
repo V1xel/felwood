@@ -9,45 +9,37 @@
 #include <variant>
 
 namespace felwood {
+    struct ColumnRef { std::string name; };
+    struct Literal   { Value val; };
 
-// ── Expressions (used in WHERE) ───────────────────────────────────────────────
+    struct BinaryExpr {
+        std::string                      op;
+        std::variant<ColumnRef, Literal> left;
+        std::variant<ColumnRef, Literal> right;
+    };
 
-struct ColumnRef { std::string name; };
-struct Literal   { Value val; };
+    struct SelectItem {
+        std::optional<AggFunc> agg;
+        std::string            col;
+        std::string            alias;
+    };
 
-struct BinaryExpr {
-    std::string                      op;    // "=", "!=", "<", ">", "<=", ">="
-    std::variant<ColumnRef, Literal> left;
-    std::variant<ColumnRef, Literal> right;
-};
+    struct CreateTableStmt {
+        std::string               name;
+        std::vector<ColumnSchema> cols;
+    };
 
-// ── SELECT list item ──────────────────────────────────────────────────────────
+    struct InsertStmt {
+        std::string        table;
+        std::vector<Value> values;
+    };
 
-struct SelectItem {
-    std::optional<AggFunc> agg;    // nullopt = plain column
-    std::string            col;    // source column name
-    std::string            alias;  // output name (same as col if no AS)
-};
+    struct SelectStmt {
+        std::vector<SelectItem>  items;
+        std::string              from;
+        std::vector<BinaryExpr>  where;
+        std::vector<std::string> group_by;
+    };
 
-// ── Statements ────────────────────────────────────────────────────────────────
-
-struct CreateTableStmt {
-    std::string               name;
-    std::vector<ColumnSchema> cols;
-};
-
-struct InsertStmt {
-    std::string        table;
-    std::vector<Value> values;
-};
-
-struct SelectStmt {
-    std::vector<SelectItem>  items;
-    std::string              from;
-    std::vector<BinaryExpr>  where;     // AND-connected conditions
-    std::vector<std::string> group_by;
-};
-
-using Stmt = std::variant<CreateTableStmt, InsertStmt, SelectStmt>;
-
-} // namespace felwood
+    using Stmt = std::variant<CreateTableStmt, InsertStmt, SelectStmt>;
+}
