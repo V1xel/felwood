@@ -92,7 +92,14 @@ namespace felwood {
 
         SelectStmt parse_select() {
             expect(TokenType::SELECT);
-            auto items = parse_select_items();
+            bool star = false;
+            std::vector<SelectItem> items;
+            if (peek().type == TokenType::STAR) {
+                consume();
+                star = true;
+            } else {
+                items = parse_select_items();
+            }
             expect(TokenType::FROM);
             std::string from = expect(TokenType::IDENT).text;
 
@@ -112,7 +119,7 @@ namespace felwood {
                 } while (match(TokenType::COMMA));
             }
 
-            return {items, from, where, group_by};
+            return {items, from, where, group_by, star};
         }
 
         std::vector<SelectItem> parse_select_items() {

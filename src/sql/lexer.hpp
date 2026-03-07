@@ -14,7 +14,7 @@ namespace felwood {
         SUM, COUNT, MIN, MAX, AVG,
         KW_INT64, KW_FLOAT64, KW_STRING, KW_BOOLEAN,
         EQ, NEQ, LT, GT, LEQ, GEQ,
-        LPAREN, RPAREN, COMMA, SEMICOLON,
+        LPAREN, RPAREN, COMMA, SEMICOLON, STAR,
         INT_LIT, FLOAT_LIT, STRING_LIT,
         IDENT,
         EOF_TOK,
@@ -117,6 +117,7 @@ namespace felwood {
                 case ')': return {TokenType::RPAREN,    ")"};
                 case ',': return {TokenType::COMMA,     ","};
                 case ';': return {TokenType::SEMICOLON, ";"};
+                case '*': return {TokenType::STAR,      "*"};
                 case '=': return {TokenType::EQ,        "="};
                 case '<':
                     if (pos_ < src_.size() && src_[pos_] == '=') { ++pos_; return {TokenType::LEQ, "<="}; }

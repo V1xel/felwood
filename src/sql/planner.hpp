@@ -41,8 +41,16 @@ namespace felwood {
         std::optional<std::unique_ptr<Operator>> execute(const SelectStmt& stmt) {
             const Table& table = catalog_.get_table(stmt.from);
 
+            std::vector<std::string> cols;
+            if (stmt.star) {
+                for (const auto& c : table.schema.columns)
+                    cols.push_back(c.name);
+            } else {
+                cols = collect_columns(stmt);
+            }
+
             std::unique_ptr<Operator> op =
-                std::make_unique<ScanOperator>(table, collect_columns(stmt));
+                std::make_unique<ScanOperator>(table, cols);
 
             if (!stmt.where.empty()) {
                 auto conditions = stmt.where;

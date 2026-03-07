@@ -39,6 +39,7 @@ namespace felwood {
         std::string              from;
         std::vector<BinaryExpr>  where;
         std::vector<std::string> group_by;
+        bool                     star = false;
     };
 
     using Stmt = std::variant<CreateTableStmt, InsertStmt, SelectStmt>;
