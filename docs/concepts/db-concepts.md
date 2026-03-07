@@ -32,6 +32,24 @@ Before modifying any in-memory or on-disk data structure, the change is appended
 
 Felwood has no WAL — if the process dies mid-flush, any rows being written at that moment are silently lost.
 
+## Tablet
+
+A tablet is a horizontal partition of a table — a subset of rows assigned by hashing a key column. When a table is created, it is split into N tablets upfront; each tablet is stored on one node and replicated across others for fault tolerance.
+
+Tablets are the smallest unit of data movement: when a node is added or removed, the cluster migrates whole tablets, not individual rows.
+
+Each tablet manages its own rowsets and segments independently — compaction runs per-tablet.
+
+Felwood has no tablets — it is single-node so the entire table is one implicit tablet.
+
+## Rowset
+
+A rowset is the immutable on-disk result of one MemTable flush. It contains one or more segment files (each ≤256MB). Once written, a rowset is never modified — new writes produce new rowsets, and compaction merges old ones.
+
+Rowsets accumulate until compaction merges them into fewer, larger rowsets. A query may need to read multiple rowsets and merge the results.
+
+Felwood has no rowsets — a single segment file per table is rewritten in place on every INSERT.
+
 ## MemTable
 
 An in-memory write buffer that accumulates incoming rows before they are flushed to disk as an immutable file. In engines like Apache Doris or RocksDB, the MemTable is sorted by the primary/sort key, so each flush produces a sorted run on disk.

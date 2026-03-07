@@ -1,5 +1,22 @@
 # Apache Doris Storage Architecture
 
+## Storage Hierarchy
+
+```
+Database
+└── Table
+    └── Tablet  (horizontal shard — subset of rows, unit of replication)
+        └── Rowset  (one MemTable flush, immutable)
+            └── segment_0.dat, segment_1.dat ...  (≤256MB each)
+```
+
+In Felwood (single-node, no sharding):
+```
+felwood_data/          ← the database
+└── orders/            ← the table
+    └── segment.seg    ← one segment per table
+```
+
 ## Segment Files
 
 A segment file is the on-disk unit of columnar storage. Each segment holds the data for a batch of rows across all columns, plus the metadata needed to query it efficiently.
@@ -77,6 +94,76 @@ Before LZ4/Zstd compression, values are encoded to make the raw bytes smaller:
 | Repeated values | Run-length encoding — `[5,5,5,5]` → `[(5, 4)]` |
 | Low cardinality | Dictionary encoding — `["alice","alice","bob"]` → `[0,0,1]` + dict |
 | General | Plain (raw bytes) — fallback |
+
+## Tablet
+
+A tablet is a horizontal slice of a table — a subset of rows, determined by hashing a key column.
+
+```
+Table: orders (9 rows total)
+
+ id │ customer │ amount          hash(id) % 3 = tablet
+────┼──────────┼────────         ──────────────────────
+  1 │ alice    │  99.5    ──→    Tablet 0  (Node A)
+  2 │ bob      │  42.0    ──→    Tablet 2  (Node C)
+  3 │ carol    │  17.0    ──→    Tablet 0  (Node A)
+  4 │ dave     │  55.0    ──→    Tablet 1  (Node B)
+  5 │ eve      │  88.0    ──→    Tablet 2  (Node C)
+  6 │ frank    │  31.0    ──→    Tablet 0  (Node A)
+  7 │ grace    │  74.0    ──→    Tablet 1  (Node B)
+  8 │ henry    │  63.0    ──→    Tablet 2  (Node C)
+  9 │ iris     │  22.0    ──→    Tablet 0  (Node A)
+
+         ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+Node A   │  Tablet 0   │    │             │    │             │
+         │  rows:      │    │  Tablet 1   │    │  Tablet 2   │
+         │  1,3,6,9    │    │  rows: 4,7  │    │  rows: 2,5,8│
+         └─────────────┘    └─────────────┘    └─────────────┘
+                                  Node B            Node C
+```
+
+Each tablet is an independent unit: stored on one node, replicated for fault tolerance, compacted independently, and the smallest unit of data movement when rebalancing.
+
+## MemTable, Rowset, and Flush
+
+Writes don't go directly to disk. They land in a **MemTable** — an in-memory buffer:
+
+```
+INSERT row 1 ──→ ┌─────────────┐
+INSERT row 2 ──→ │  MemTable   │  (in RAM, mutable, ~100MB limit)
+INSERT row 3 ──→ │  row 1      │
+                 │  row 2      │
+                 │  row 3      │
+                 └─────────────┘
+                       │
+               MemTable full or
+               explicit flush
+                       │
+                       ▼
+              sort by key column
+                       │
+                       ▼
+                ┌─────────────┐
+                │  Rowset 0   │  (on disk, immutable)
+                │  segment_0  │
+                │  segment_1  │  ← if >256MB, spills to next segment
+                └─────────────┘
+```
+
+A **Rowset** is the immutable on-disk result of one flush. As more data arrives, more rowsets accumulate:
+
+```
+Time ──────────────────────────────────────────────────────────→
+
+Flush 1           Flush 2           Compaction
+┌──────────┐      ┌──────────┐      ┌──────────────────────┐
+│ Rowset 0 │  +   │ Rowset 1 │  →   │      Rowset 2        │
+│ seg_0    │      │ seg_0    │      │      seg_0            │
+│ seg_1    │      │          │      │      (merged+sorted)  │
+└──────────┘      └──────────┘      └──────────────────────┘
+```
+
+Compaction merges rowsets in the background to keep read performance healthy — fewer files to open and more opportunity to skip data via zone maps.
 
 ## File Hierarchy
 
