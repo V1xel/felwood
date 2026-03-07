@@ -34,11 +34,17 @@ namespace felwood {
         std::vector<Value> values;
     };
 
+    struct OrderByKey {
+        std::string col;
+        bool        asc = true;
+    };
+
     struct SelectStmt {
         std::vector<SelectItem>  items;
         std::string              from;
         std::vector<BinaryExpr>  where;
         std::vector<std::string> group_by;
+        std::vector<OrderByKey>  order_by;
         bool                     star = false;
     };
 

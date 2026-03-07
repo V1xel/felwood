@@ -119,7 +119,20 @@ namespace felwood {
                 } while (match(TokenType::COMMA));
             }
 
-            return {items, from, where, group_by, star};
+            std::vector<OrderByKey> order_by;
+            if (peek().type == TokenType::ORDER) {
+                consume();
+                expect(TokenType::BY);
+                do {
+                    std::string col = expect(TokenType::IDENT).text;
+                    bool asc = true;
+                    if (peek().type == TokenType::DESC)      { consume(); asc = false; }
+                    else if (peek().type == TokenType::ASC)  { consume(); }
+                    order_by.push_back({col, asc});
+                } while (match(TokenType::COMMA));
+            }
+
+            return {items, from, where, group_by, order_by, star};
         }
 
         std::vector<SelectItem> parse_select_items() {

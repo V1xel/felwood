@@ -9,13 +9,6 @@
 
 using namespace felwood;
 
-static void run_sql(const std::string& sql, Catalog& catalog) {
-    Lexer   lexer(sql);
-    Parser  parser(lexer.tokenize());
-    Planner planner(catalog);
-    planner.plan(parser.parse());
-}
-
 int main() {
     Catalog catalog("felwood_data");
 

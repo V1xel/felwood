@@ -5,6 +5,7 @@
 #include "operators/scan.hpp"
 #include "operators/filter.hpp"
 #include "operators/aggregate.hpp"
+#include "operators/sort.hpp"
 
 #include <memory>
 #include <optional>
@@ -72,6 +73,9 @@ namespace felwood {
                 op = std::make_unique<AggregateOperator>(
                     std::move(op), stmt.group_by[0], std::move(specs));
             }
+
+            if (!stmt.order_by.empty())
+                op = std::make_unique<SortOperator>(std::move(op), stmt.order_by);
 
             return op;
         }

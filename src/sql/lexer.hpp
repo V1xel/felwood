@@ -10,7 +10,7 @@
 
 namespace felwood {
     enum class TokenType {
-        CREATE, TABLE, INSERT, INTO, VALUES, SELECT, FROM, WHERE, GROUP, BY, AS, AND,
+        CREATE, TABLE, INSERT, INTO, VALUES, SELECT, FROM, WHERE, GROUP, ORDER, BY, AS, AND, ASC, DESC,
         SUM, COUNT, MIN, MAX, AVG,
         KW_INT64, KW_FLOAT64, KW_STRING, KW_BOOLEAN,
         EQ, NEQ, LT, GT, LEQ, GEQ,
@@ -96,7 +96,9 @@ namespace felwood {
                 {"INSERT",  TokenType::INSERT},  {"INTO",    TokenType::INTO},
                 {"VALUES",  TokenType::VALUES},  {"SELECT",  TokenType::SELECT},
                 {"FROM",    TokenType::FROM},    {"WHERE",   TokenType::WHERE},
-                {"GROUP",   TokenType::GROUP},   {"BY",      TokenType::BY},
+                {"GROUP",   TokenType::GROUP},   {"ORDER",   TokenType::ORDER},
+                {"BY",      TokenType::BY},      {"ASC",     TokenType::ASC},
+                {"DESC",    TokenType::DESC},
                 {"AS",      TokenType::AS},      {"AND",     TokenType::AND},
                 {"SUM",     TokenType::SUM},     {"COUNT",   TokenType::COUNT},
                 {"MIN",     TokenType::MIN},     {"MAX",     TokenType::MAX},
