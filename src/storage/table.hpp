@@ -32,6 +32,7 @@ namespace felwood {
 
     class Table {
     public:
+        uint64_t            id = 0;
         std::string         name;
         TableSchema         schema;
         std::vector<Column> columns;

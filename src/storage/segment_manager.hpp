@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <unordered_map>
 
 namespace felwood {
 
@@ -22,10 +23,19 @@ public:
         : root_(std::move(data_dir))
     {
         fs::create_directories(root_);
+        load_catalog();
+    }
+
+    // Assigns a new numeric ID to the given table name and persists the mapping.
+    uint64_t assign_id(const std::string& name) {
+        uint64_t id = next_id_++;
+        name_to_id_[name] = id;
+        save_catalog();
+        return id;
     }
 
     void flush(const Table& table) const {
-        fs::path dir = table_dir(table.name);
+        fs::path dir = table_dir(table.id);
         fs::create_directories(dir);
 
         std::ofstream f(dir / "segment.seg", std::ios::binary | std::ios::trunc);
@@ -71,10 +81,8 @@ public:
 
     [[nodiscard]] std::vector<std::unique_ptr<Table>> load_all() const {
         std::vector<std::unique_ptr<Table>> tables;
-        if (!fs::exists(root_)) return tables;
-        for (const auto& entry : fs::directory_iterator(root_)) {
-            if (!entry.is_directory()) continue;
-            auto tbl = load_segment(entry.path().filename().string());
+        for (const auto& [name, id] : name_to_id_) {
+            auto tbl = load_segment(id, name);
             if (tbl) tables.push_back(std::move(tbl));
         }
         return tables;
@@ -82,9 +90,53 @@ public:
 
 private:
     std::string root_;
+    std::unordered_map<std::string, uint64_t> name_to_id_;
+    uint64_t next_id_ = 1;
 
-    [[nodiscard]] fs::path table_dir(const std::string& name) const {
-        return fs::path(root_) / name;
+    [[nodiscard]] fs::path catalog_path() const {
+        return fs::path(root_) / "catalog.dat";
+    }
+
+    [[nodiscard]] fs::path table_dir(uint64_t id) const {
+        return fs::path(root_) / std::to_string(id);
+    }
+
+    void save_catalog() const {
+        std::ofstream f(catalog_path(), std::ios::binary | std::ios::trunc);
+        if (!f) throw std::runtime_error("SegmentManager: cannot write catalog.dat");
+
+        f.write(reinterpret_cast<const char*>(&next_id_), 8);
+        uint32_t count = static_cast<uint32_t>(name_to_id_.size());
+        f.write(reinterpret_cast<const char*>(&count), 4);
+
+        for (const auto& [name, id] : name_to_id_) {
+            f.write(reinterpret_cast<const char*>(&id), 8);
+            uint8_t len = static_cast<uint8_t>(name.size());
+            f.write(reinterpret_cast<const char*>(&len), 1);
+            f.write(name.data(), len);
+        }
+    }
+
+    void load_catalog() {
+        fs::path path = catalog_path();
+        if (!fs::exists(path)) return;
+
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return;
+
+        f.read(reinterpret_cast<char*>(&next_id_), 8);
+        uint32_t count = 0;
+        f.read(reinterpret_cast<char*>(&count), 4);
+
+        for (uint32_t i = 0; i < count; ++i) {
+            uint64_t id = 0;
+            f.read(reinterpret_cast<char*>(&id), 8);
+            uint8_t len = 0;
+            f.read(reinterpret_cast<char*>(&len), 1);
+            std::string name(len, '\0');
+            f.read(name.data(), len);
+            name_to_id_[name] = id;
+        }
     }
 
     static void write_column(std::ofstream& f, const Column& col) {
@@ -106,8 +158,8 @@ private:
         }, col.data);
     }
 
-    [[nodiscard]] std::unique_ptr<Table> load_segment(const std::string& name) const {
-        fs::path path = table_dir(name) / "segment.seg";
+    [[nodiscard]] std::unique_ptr<Table> load_segment(uint64_t id, const std::string& name) const {
+        fs::path path = table_dir(id) / "segment.seg";
         if (!fs::exists(path)) return nullptr;
 
         std::ifstream f(path, std::ios::binary);
@@ -156,6 +208,7 @@ private:
         }
 
         auto table = std::make_unique<Table>(name, std::move(schema));
+        table->id = id;
 
         for (std::size_t i = 0; i < metas.size(); ++i) {
             f.seekg(static_cast<std::streamoff>(metas[i].offset));

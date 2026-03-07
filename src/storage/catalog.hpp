@@ -24,10 +24,11 @@ namespace felwood {
         void create_table(const std::string& name, TableSchema schema) {
             if (tables_.count(name))
                 throw std::runtime_error("Catalog: table already exists: " + name);
-            auto& tbl = *tables_.emplace(
-                name, std::make_unique<Table>(name, std::move(schema))
-            ).first->second;
-            if (storage_) storage_->flush(tbl);
+            uint64_t id = storage_ ? storage_->assign_id(name) : 0;
+            auto tbl = std::make_unique<Table>(name, std::move(schema));
+            tbl->id = id;
+            auto& ref = *tables_.emplace(name, std::move(tbl)).first->second;
+            if (storage_) storage_->flush(ref);
         }
 
         void insert_row(const std::string& name, const std::vector<Value>& row) {
