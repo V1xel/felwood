@@ -70,6 +70,16 @@ Two common strategies:
 
 Felwood has no compaction — a single segment file per table is rewritten on every INSERT.
 
+## Stable Identifiers (ID-based Storage Layout)
+
+Database objects (tables, databases) are stored on disk using numeric IDs rather than their user-facing names. The name-to-ID mapping lives in metadata (e.g., Doris FE catalog, PostgreSQL pg_class).
+
+This means a rename (`ALTER TABLE RENAME`) is a cheap metadata update — only the mapping changes, nothing on disk moves. If folders were named after tables, renaming would require moving gigabytes of data across all nodes.
+
+The same principle appears in filesystems: filenames are just directory entries that point to inodes (numeric IDs). The actual data is addressed by inode, not by name.
+
+Felwood uses folder names directly (`felwood_data/orders/`) — renaming a table would require renaming the folder and rewriting the segment.
+
 ## Key Models (Table Semantics)
 
 How an engine handles rows with the same primary key:
